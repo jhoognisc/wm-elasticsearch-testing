@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="LOGGING_FORMAT" source="logging.format" defaultValue="secured"/>
+    <!-- Set the LOGGING_FORMAT environment variable to "json" for JSON-formatted logs -->
+    <include resource="coop/nisc/logging/logback/${LOGGING_FORMAT}-springboot-base.xml"/>
+    <jmxConfigurator/>
+</configuration>

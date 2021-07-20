@@ -23,6 +23,3 @@ As is the norm with _Gradle_, use `./gradlew tasks` to list all available tasks.
 tasks:
 - **build** - compiles and tests all modules
 - **dockerBuildImage** - creates/updates the deployable _Docker_ image for all modules
-
-
-_This project was originally generated using the [Bedrock Initializr](https://initializr.arcus.coop/)._

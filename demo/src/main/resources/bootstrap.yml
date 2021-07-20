@@ -1,0 +1,15 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: wm-demo
+  cloud:
+    config:
+      profile: ${CONFIG_PROFILE:local}
+      uri: ${CONFIG_SERVICE_URL:http://localhost:8888}
+
+management:
+  metrics:
+    enable:
+      process.start.time: false

@@ -1,0 +1,163 @@
+buildscript {
+    ext {
+        springBootVersion = '2.4.5'
+    }
+    repositories {
+        maven {
+            url "${remoteRepositoryUrl}/libs-release"
+            credentials {
+                username = "${artifactoryUser}"
+                password = "${artifactoryPassword}"
+            }
+        }
+    }
+    dependencies {
+        classpath 'coop.nisc.helmsman:helmsman:2.1.0'
+        classpath "com.bmuschko:gradle-docker-plugin:6.4.0"
+        classpath 'io.spring.gradle:propdeps-plugin:0.0.10.RELEASE'
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+    }
+}
+
+plugins {
+    id 'io.franzbecker.gradle-lombok' version '3.2.0'
+    id 'java'
+    id 'application'
+    id 'project-report'
+}
+
+ext {
+    springCloudVersion = '2020.0.2'
+}
+
+apply plugin: 'coop.nisc.helmsman'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'propdeps'
+apply plugin: 'propdeps-idea'
+apply plugin: 'com.bmuschko.docker-spring-boot-application'
+apply plugin: 'io.spring.dependency-management'
+
+mainClassName = 'coop.nisc.demo.DemoApplication'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+// NOTE: by convention, we want our artifacts to match the application name (see application.yml)
+jar {
+    archiveFileName = "wm-demo-application.${jar.archiveExtension.get()}"
+    enabled = true
+}
+
+bootJar {
+    archiveFileName = "wm-demo.${archiveExtension.get()}"
+    archiveClassifier = 'boot'
+}
+
+distTar {
+    archiveFileName = "wm-demo.${archiveExtension.get()}"
+}
+
+distZip {
+    archiveFileName = "wm-demo.${archiveExtension.get()}"
+}
+
+configurations.all {
+    exclude group: "commons-logging", module: "commons-logging"
+    exclude group: 'log4j'
+    exclude group: 'org.slf4j', module: 'slf4j-log4j12'
+}
+
+dependencies {
+    // For coherence, it is recommended to keep each dependency grouping in alphabetical order
+    implementation("coop.nisc.boulder:gravel-spring:0.8")
+    implementation("coop.nisc.boulder:nisc-logging-spring2-logback:1.1.0")
+    implementation("coop.nisc.boulder:nisc-metrics-spring2-prometheus:1.2.0")
+
+    annotationProcessor platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+    implementation platform("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
+
+    implementation("org.webjars:bootstrap:3.3.7")
+
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
+    implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.cloud:spring-cloud-sleuth-zipkin")
+    implementation("org.springframework.cloud:spring-cloud-starter-config")
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
+    implementation("org.springframework.cloud:spring-cloud-starter-sleuth")
+
+    // SpringCloud 2020.0.0-M4 and later (used with SpringBoot 2.4.0+) stopped using a bootstrap context by default.
+    // We'll re-enable it...see https://spring.io/blog/2020/10/07/spring-cloud-2020-0-0-m4-aka-ilford-is-available
+    runtimeOnly("org.springframework.cloud:spring-cloud-starter-bootstrap")
+
+    implementation("org.projectlombok:lombok")
+
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+}
+
+compileJava.dependsOn(processResources)
+
+test {
+    include 'coop/nisc/**/*Test.class'
+    // If you have an API, you should provide Consumer Driver Contracts
+    // See https://confluence.nisc.coop/display/BEDROCK/Implement+Contract+Testing
+    include 'org/springframework/cloud/contract/**/*Test.class'
+    testLogging {
+        exceptionFormat = 'full'
+    }
+    useJUnitPlatform()
+}
+
+springBoot {
+    buildInfo {
+        properties {
+            additional = [
+                    'git.branch'  : "${gitBranch}",
+                    'git.revision': "${gitRevision}"
+            ]
+        }
+    }
+}
+
+docker {
+    springBootApplication {
+        baseImage = 'harbor.arcus.coop/base/springboot-base:jdk11'
+
+        images = ["harbor.arcus.coop/${applicationNamespace}/${project.name}:${project.version}"]
+        ports = [8080, 9080, 5280, 9280] //server port, management port, remote debug port, jmx port
+    }
+
+    if (!project.hasProperty("harborUsername")) {
+        ext.harborUsername = 'anonymous'
+    }
+    if (!project.hasProperty("harborPassword")) {
+        ext.harborPassword = ''
+    }
+
+    registryCredentials {
+        url = 'https://harbor.arcus.coop/'
+        username = "${harborUsername}"
+        password = "${harborPassword}"
+    }
+}
+
+helm {
+    // Refer to https://stash.nisc.coop/projects/BLDTOOL/repos/helmsman/browse/README.md
+    // for plugin usage information.
+    description = 'Demo project built by Bedrock'
+}
+
+/**
+ * Hacky-task to copy the dependent resource 'build-info.properties' into
+ * the appropriate directory for inclusion in IntelliJ classpath.
+ */
+task ideaCopyBuildInfo(type: Copy) {
+    group 'IDE'
+    description 'Copies the "build-info.properties" for running application within IntelliJ'
+
+    from('build/resources/main/META-INF/build-info.properties')
+    into('out/production/resources/META-INF/')
+}
